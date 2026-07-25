@@ -141,6 +141,7 @@ const inventoryOptions = reactive<{ owned: MerchantInventoryOption[]; catalog: M
 })
 const latestInventoryItems = ref<MerchantInventoryLatestItem[]>([])
 const inventoryRows = ref<InventoryDraftRow[]>([])
+const inventorySourceMode = ref<InventorySourceType>('owned')
 const inventorySearch = ref('')
 const inventoryLoading = ref(false)
 const inventoryLoaded = ref(false)
@@ -281,31 +282,15 @@ const latestInventoryMap = computed(() =>
   new Map(latestInventoryItems.value.map((item) => [item.rule_id, item]))
 )
 const inventorySelectedRuleIds = computed(() => new Set(inventoryRows.value.map((row) => row.rule_id)))
-const inventoryRowByRuleId = computed(() =>
-  new Map(inventoryRows.value.map((row) => [row.rule_id, row]))
-)
 const inventoryOptionPool = computed(() => [...inventoryOptions.owned, ...inventoryOptions.catalog])
-const inventoryOptionByRuleId = computed(() =>
-  new Map(inventoryOptionPool.value.map((option) => [option.rule_id, option]))
-)
-const selectedInventoryOptions = computed(() =>
-  inventoryRows.value.map((row) => inventoryOptionByRuleId.value.get(row.rule_id) || ({
-    source_type: row.source_type,
-    rule_id: row.rule_id,
-    product: row.product,
-    keywords: [],
-    category: null,
-    available: row.source_type === 'owned' ? true : null,
-    has_active_application: row.has_active_application,
-    latest_quantity: row.latestQuantity,
-  }))
-)
 const inventorySearchDraftName = computed(() => inventorySearch.value.trim())
-const filteredInventoryOptions = computed(() => {
+const inventorySourceOptions = computed(() =>
+  inventorySourceMode.value === 'owned' ? inventoryOptions.owned : inventoryOptions.catalog
+)
+const matchingInventoryOptions = computed(() => {
   const keyword = inventorySearchDraftName.value.toLowerCase()
-  const rows = inventoryOptionPool.value
-  if (!keyword) return rows
-  return rows.filter((option) => {
+  if (!keyword) return []
+  return inventoryOptionPool.value.filter((option) => {
     const haystack = [
       option.product,
       option.category || '',
@@ -314,27 +299,46 @@ const filteredInventoryOptions = computed(() => {
     return haystack.includes(keyword)
   })
 })
-const filteredInventoryOptionRows = computed(() => {
-  const selectedRuleIds = inventorySelectedRuleIds.value
-  const options = [
-    ...selectedInventoryOptions.value,
-    ...filteredInventoryOptions.value.filter((option) => !selectedRuleIds.has(option.rule_id)),
-  ]
-  return options.map((option) => ({
-    option,
-    row: inventoryRowByRuleId.value.get(option.rule_id) || null,
-  }))
+const filteredInventoryOptions = computed(() => {
+  const keyword = inventorySearchDraftName.value.toLowerCase()
+  if (!keyword) return []
+  return inventorySourceOptions.value.filter((option) => {
+    const haystack = [
+      option.product,
+      option.category || '',
+      ...(option.keywords || []),
+    ].join(' ').toLowerCase()
+    return haystack.includes(keyword)
+  })
 })
-const inventorySearchHasNoMatches = computed(() =>
+const inventorySourceHasNoMatches = computed(() =>
   Boolean(inventorySearchDraftName.value) && filteredInventoryOptions.value.length === 0
 )
-const inventoryShouldShowEmptyState = computed(() =>
-  !inventorySearchHasNoMatches.value && filteredInventoryOptionRows.value.length === 0
+const inventorySearchHasNoMatches = computed(() =>
+  Boolean(inventorySearchDraftName.value) && matchingInventoryOptions.value.length === 0
+)
+const inventoryRowsTotalQuantity = computed(() => inventoryRows.value.reduce((total, row) => {
+  const quantity = Number(row.quantity)
+  return Number.isInteger(quantity) && quantity >= 0 ? total + quantity : total
+}, 0))
+const inventoryLatestSubmittedAt = computed(() => latestInventoryItems.value.reduce<string | null>((latest, item) => {
+  if (!item.submitted_at) return latest
+  if (!latest) return item.submitted_at
+  return new Date(item.submitted_at).getTime() > new Date(latest).getTime() ? item.submitted_at : latest
+}, null))
+const inventorySourceNote = computed(() => inventorySourceMode.value === 'owned'
+  ? '商品管理中已开通的机器'
+  : '可上报库存，不会自动开通商品'
 )
 const inventoryCanSubmit = computed(() =>
   inventoryRows.value.length > 0 && hasValidInventorySnapshotQuantities(inventoryRows.value)
 )
-const inventorySubmitDisabled = computed(() => inventorySubmitting.value)
+const inventorySubmitDisabled = computed(() => inventorySubmitting.value || !inventoryCanSubmit.value)
+const inventorySubmitSummary = computed(() => {
+  if (inventoryRows.value.length === 0) return '选择机器后填写库存数量'
+  if (!inventoryCanSubmit.value) return '请填写 0 或更大的整数'
+  return `将提交 ${inventoryRows.value.length} 款机器，共 ${inventoryRowsTotalQuantity.value} 台库存`
+})
 const feedbackProductOptions = computed(() => {
   const seen = new Set<string>()
   return products.value.filter((product) => {
@@ -975,6 +979,28 @@ function inventoryOptionLatestQuantity(option: MerchantInventoryOption) {
   return typeof option.latest_quantity === 'number' ? option.latest_quantity : null
 }
 
+function inventoryRowLatestTime(row: InventoryDraftRow) {
+  return latestInventoryMap.value.get(row.rule_id)?.submitted_at || null
+}
+
+function inventorySourceText(sourceType: InventorySourceType) {
+  return sourceType === 'owned' ? '我的商品' : '平台机器库'
+}
+
+function inventoryOptionStatusText(option: MerchantInventoryOption) {
+  if (option.source_type === 'owned') {
+    return option.available === false ? '已暂停' : '接单中'
+  }
+  return option.has_active_application ? '已申请' : '待申请'
+}
+
+function inventoryOptionStatusClass(option: MerchantInventoryOption) {
+  if (option.source_type === 'owned') {
+    return option.available === false ? 'paused' : 'active'
+  }
+  return option.has_active_application ? 'applied' : 'catalog'
+}
+
 function inventoryOptionActionText(option: MerchantInventoryOption) {
   const product = option.product.trim() || '机器'
   return inventorySelectedRuleIds.value.has(option.rule_id) ? `编辑 ${product} 数量` : `选择 ${product}`
@@ -1113,6 +1139,11 @@ function focusInventorySearchInput() {
   })
 }
 
+function switchInventorySource(sourceType: InventorySourceType) {
+  inventorySourceMode.value = sourceType
+  focusInventorySearchInput()
+}
+
 async function submitInventorySnapshot() {
   if (inventorySubmitting.value) {
     return
@@ -1152,7 +1183,7 @@ async function submitInventorySnapshot() {
         option.latest_quantity = submitted.quantity
       }
     }
-    showInventoryNotice('已提交')
+    showInventoryNotice('库存快照已提交并同步数据中转平台')
     inventoryRows.value = []
     focusInventorySearchInput()
     return
@@ -1161,7 +1192,7 @@ async function submitInventorySnapshot() {
   inventorySubmitting.value = true
   try {
     await api.submitInventorySnapshot(items)
-    showInventoryNotice('已提交')
+    showInventoryNotice('库存快照已提交并同步数据中转平台')
     inventoryRows.value = []
     await refreshInventoryOptions()
     focusInventorySearchInput()
@@ -2249,6 +2280,7 @@ function logout(reason: LogoutReason = 'manual') {
   latestInventoryItems.value = []
   inventoryRows.value = []
   inventorySearch.value = ''
+  inventorySourceMode.value = 'owned'
   inventoryLoaded.value = false
   clearInventoryNotice()
   inventoryError.value = ''
@@ -2917,101 +2949,227 @@ async function run(task: () => Promise<void>) {
         <!-- Machine Inventory -->
         <template v-if="navActive === 'machineInventory'">
           <div class="inventory-page">
-            <h1 class="sr-only">机器库存</h1>
+            <header class="inventory-page-header">
+              <div>
+                <h1>机器库存</h1>
+                <p>更新当前可用数量</p>
+              </div>
+              <span v-if="inventoryLatestSubmittedAt" class="inventory-last-sync">
+                上次提交 {{ formatTime(inventoryLatestSubmittedAt) }}
+              </span>
+            </header>
 
-            <p v-if="inventoryNotice" class="inventory-notice">{{ inventoryNotice }}</p>
-            <p v-if="inventoryError" class="inventory-error">{{ inventoryError }}</p>
+            <p v-if="inventoryNotice" class="inventory-notice" role="status">{{ inventoryNotice }}</p>
+            <p v-if="inventoryError" class="inventory-error" role="alert">{{ inventoryError }}</p>
 
-            <div class="inventory-layout">
-              <section class="inventory-picker-card">
+            <div class="inventory-workbench">
+              <section class="inventory-pane inventory-picker-pane">
+                <header class="inventory-pane-header">
+                  <div>
+                    <h2>选择机器</h2>
+                    <p>搜索后加入本次清单</p>
+                  </div>
+                </header>
+
                 <div class="inventory-picker-toolbar">
+                  <div class="inventory-source-tabs" role="tablist" aria-label="机器来源">
+                    <button
+                      type="button"
+                      role="tab"
+                      :aria-selected="inventorySourceMode === 'owned'"
+                      :class="{ active: inventorySourceMode === 'owned' }"
+                      @click="switchInventorySource('owned')"
+                    >
+                      我的商品
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      :aria-selected="inventorySourceMode === 'catalog'"
+                      :class="{ active: inventorySourceMode === 'catalog' }"
+                      @click="switchInventorySource('catalog')"
+                    >
+                      平台机器库
+                    </button>
+                  </div>
+
                   <div class="inventory-search-box">
+                    <svg class="inventory-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="m20 20-3.5-3.5" />
+                    </svg>
                     <input
                       v-model="inventorySearch"
                       type="search"
                       enterkeyhint="next"
                       autocomplete="off"
-                      aria-label="搜索机器"
+                      aria-label="搜索品牌或型号"
                       data-inventory-search
                       @keydown.enter="handleInventorySearchEnter"
                       @keydown.esc="handleInventorySearchEscape"
-                      placeholder="搜索"
+                      placeholder="搜索品牌或型号"
                     />
                     <span
                       v-if="inventorySearchHasNoMatches"
                       class="inventory-search-apply"
                       role="button"
                       tabindex="0"
-                      :aria-label="`申请 ${inventorySearchDraftName}`"
-                      :title="`申请 ${inventorySearchDraftName}`"
+                      :aria-label="`申请新增 ${inventorySearchDraftName}`"
+                      :title="`申请新增 ${inventorySearchDraftName}`"
                       @click="openInventoryProductApplicationFromSearch"
                       @keydown.enter.prevent="openInventoryProductApplicationFromSearch"
                       @keydown.space.prevent="openInventoryProductApplicationFromSearch"
                     >
-                      +
+                      申请新增
+                    </span>
+                  </div>
+                  <p class="inventory-source-note">{{ inventorySourceNote }}</p>
+                </div>
+
+                <div v-if="inventoryLoading" class="inventory-picker-state" role="status">
+                  <span class="inventory-loading-mark" aria-hidden="true"></span>
+                  正在加载机器
+                </div>
+                <div v-else-if="!inventorySearchDraftName" class="inventory-picker-state inventory-picker-empty">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-3.5-3.5" />
+                  </svg>
+                  <strong>输入品牌或型号</strong>
+                  <span>找到后点击机器即可加入</span>
+                </div>
+                <div v-else-if="inventorySourceHasNoMatches" class="inventory-picker-state inventory-picker-empty">
+                  <strong>当前来源没有匹配机器</strong>
+                  <span v-if="!inventorySearchHasNoMatches">可切换另一个来源查看</span>
+                  <span v-else>可点击搜索框内的“申请新增”</span>
+                </div>
+                <div v-else class="inventory-option-list">
+                  <div
+                    v-for="option in filteredInventoryOptions"
+                    :key="inventoryOptionKey(option)"
+                    class="inventory-option-row"
+                    :class="{ selected: inventorySelectedRuleIds.has(option.rule_id) }"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="inventoryOptionActionText(option)"
+                    :title="inventoryOptionActionText(option)"
+                    @click="addInventoryOption(option)"
+                    @keydown.enter.self.prevent="addInventoryOption(option)"
+                    @keydown.space.self.prevent="addInventoryOption(option)"
+                  >
+                    <span class="inventory-option-main">
+                      <strong>{{ option.product }}</strong>
+                      <span class="inventory-option-meta">
+                        <em class="inventory-status" :class="inventoryOptionStatusClass(option)">{{ inventoryOptionStatusText(option) }}</em>
+                        <span v-if="inventoryOptionLatestQuantity(option) !== null">
+                          上次 {{ inventoryOptionLatestQuantity(option) }} 台
+                        </span>
+                        <span v-else>暂无库存记录</span>
+                      </span>
+                    </span>
+                    <span class="inventory-option-action">
+                      {{ inventorySelectedRuleIds.has(option.rule_id) ? '已加入' : '加入' }}
                     </span>
                   </div>
                 </div>
+              </section>
 
-                <div v-if="inventoryLoading" class="inventory-empty" role="status" aria-label="加载中">...</div>
-                <div v-else class="inventory-option-list">
+              <section class="inventory-pane inventory-draft-pane">
+                <header class="inventory-pane-header inventory-draft-header">
+                  <div>
+                    <h2>本次库存</h2>
+                    <p>填写当前实际可用数量</p>
+                  </div>
+                  <div class="inventory-draft-summary" aria-live="polite">
+                    <strong>{{ inventoryRows.length }}</strong>
+                    <span>款</span>
+                    <i></i>
+                    <strong>{{ inventoryRowsTotalQuantity }}</strong>
+                    <span>台</span>
+                  </div>
+                </header>
+
+                <div class="inventory-draft-columns" aria-hidden="true">
+                  <span>机器</span>
+                  <span>库存数量</span>
+                  <span></span>
+                </div>
+
+                <div v-if="inventoryRows.length === 0" class="inventory-draft-empty">
+                  <span class="inventory-draft-empty-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                      <path d="M4 7h16" />
+                      <path d="M4 12h16" />
+                      <path d="M4 17h10" />
+                      <path d="M18 15v6" />
+                      <path d="M15 18h6" />
+                    </svg>
+                  </span>
+                  <strong>还没有选择机器</strong>
+                  <span>从左侧搜索并加入</span>
+                </div>
+
+                <div v-else class="inventory-draft-list">
                   <div
-                    v-for="item in filteredInventoryOptionRows"
-                    :key="inventoryOptionKey(item.option)"
-                    class="inventory-option-row"
-                    :class="{ selected: Boolean(item.row), invalid: item.row ? isInventoryRowQuantityInvalid(item.row) : false }"
-                    :role="item.row ? undefined : 'button'"
-                    :tabindex="item.row ? undefined : 0"
-                    :aria-label="inventoryOptionActionText(item.option)"
-                    :title="inventoryOptionActionText(item.option)"
-                    @click="addInventoryOption(item.option)"
-                    @keydown.enter.self.prevent="addInventoryOption(item.option)"
-                    @keydown.space.self.prevent="addInventoryOption(item.option)"
+                    v-for="row in inventoryRows"
+                    :key="row.key"
+                    class="inventory-draft-row"
+                    :class="{ invalid: isInventoryRowQuantityInvalid(row) }"
                   >
-                    <span class="inventory-option-main inventory-option-name">
-                      <strong>{{ item.option.product }}</strong>
-                    </span>
-                    <template v-if="item.row">
-                      <label class="inventory-quantity-field inventory-inline-quantity" @click.stop>
+                    <div class="inventory-draft-main">
+                      <strong>{{ row.product }}</strong>
+                      <span>
+                        {{ inventorySourceText(row.source_type) }}
+                        <template v-if="row.latestQuantity !== null">
+                          · 上次 {{ row.latestQuantity }} 台
+                          <template v-if="inventoryRowLatestTime(row)">
+                            · {{ formatTime(inventoryRowLatestTime(row) || '') }}
+                          </template>
+                        </template>
+                        <template v-else>· 首次上报</template>
+                      </span>
+                    </div>
+                    <label class="inventory-quantity-field">
                       <input
-                        :value="item.row.quantity"
-                        :data-inventory-row-key="item.row.key"
-                        :aria-label="`${item.row.product} 库存数量`"
+                        :value="row.quantity"
+                        :data-inventory-row-key="row.key"
+                        :aria-label="`${row.product} 库存数量`"
                         type="number"
                         inputmode="numeric"
                         enterkeyhint="done"
                         autocomplete="off"
                         min="0"
                         step="1"
-                        :aria-invalid="isInventoryRowQuantityInvalid(item.row) ? 'true' : 'false'"
-                        @input="updateInventoryRowQuantity(item.row.key, $event)"
-                        @keydown.enter.prevent="handleInventoryQuantityEnter(item.row.key)"
-                        @keydown.esc="handleInventoryQuantityEscape(item.row.key, $event)"
+                        :aria-invalid="isInventoryRowQuantityInvalid(row) ? 'true' : 'false'"
+                        @input="updateInventoryRowQuantity(row.key, $event)"
+                        @keydown.enter.prevent="handleInventoryQuantityEnter(row.key)"
+                        @keydown.esc="handleInventoryQuantityEscape(row.key, $event)"
                       />
-                      </label>
-                      <button
-                        type="button"
-                        class="btn btn-ghost inventory-remove-row"
-                        aria-label="移除"
-                        @click.stop="removeInventoryRow(item.row.key)"
-                      >
-                        &times;
-                      </button>
-                    </template>
-                  </div>
-                  <div
-                    v-if="inventoryShouldShowEmptyState"
-                    class="inventory-empty"
-                  >
-                    <span>暂无</span>
+                      <span>台</span>
+                    </label>
+                    <button
+                      type="button"
+                      class="btn btn-ghost inventory-remove-row"
+                      :aria-label="`移除 ${row.product}`"
+                      title="移除"
+                      @click="removeInventoryRow(row.key)"
+                    >
+                      &times;
+                    </button>
                   </div>
                 </div>
 
-                <div v-if="inventoryCanSubmit" class="inventory-submit-footer">
-                  <button class="btn btn-primary" :disabled="inventorySubmitDisabled" :aria-label="inventorySubmitting ? '提交中' : '提交库存'" @click="submitInventorySnapshot">
-                    {{ inventorySubmitting ? '...' : '提交' }}
+                <footer class="inventory-submit-footer">
+                  <p :class="{ invalid: inventoryRows.length > 0 && !inventoryCanSubmit }">{{ inventorySubmitSummary }}</p>
+                  <button
+                    class="btn btn-primary"
+                    :disabled="inventorySubmitDisabled"
+                    :aria-label="inventorySubmitting ? '提交中' : '提交库存快照'"
+                    @click="submitInventorySnapshot"
+                  >
+                    {{ inventorySubmitting ? '提交中...' : '提交库存快照' }}
                   </button>
-                </div>
+                </footer>
               </section>
             </div>
           </div>

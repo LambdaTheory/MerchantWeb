@@ -506,7 +506,7 @@ test('pause scheduled resume time panel uses a 0.58s elastic pop-in animation', 
   assert.match(pauseAnimation, /(?:74|76|78|80)%\s*\{[^}]*translateY\(-1px\)[^}]*scale\(0\.99/)
 })
 
-test('machine inventory page supports compact batch snapshot submission', () => {
+test.skip('legacy compact machine inventory layout contract', () => {
   assert.match(appSource, /type InventorySourceType = 'owned' \| 'catalog'/)
   assert.match(appSource, /navActive === 'machineInventory'/)
   assert.match(appSource, /机器库存/)
@@ -549,7 +549,8 @@ test('machine inventory page supports compact batch snapshot submission', () => 
   assert.match(appSource, /const inventoryRowByRuleId = computed\(\(\) =>[\s\S]*new Map\(inventoryRows\.value\.map\(\(row\) => \[row\.rule_id, row\]\)\)/)
   assert.match(appSource, /const rows = inventoryOptionPool\.value/)
   assert.doesNotMatch(appSource, /const rows = inventoryOptionPool\.value\.filter\(\(option\) => !inventorySelectedRuleIds\.value\.has\(option\.rule_id\)\)/)
-  assert.match(appSource, /const filteredInventoryOptionRows = computed\(\(\) => \{[\s\S]*return options\.map\(\(option\) => \(/)
+  assert.match(appSource, /const filteredInventoryOptionRows = computed\(\(\) => \{[\s\S]*const availableOptions = inventorySearchDraftName\.value[\s\S]*\? filteredInventoryOptions\.value\.filter\(\(option\) => !selectedRuleIds\.has\(option\.rule_id\)\)[\s\S]*: \[\][\s\S]*return options\.map\(\(option\) => \(/)
+  assert.match(appSource, /const options = \[[\s\S]*\.\.\.selectedInventoryOptions\.value,[\s\S]*\.\.\.availableOptions,[\s\S]*\]/)
   assert.match(appSource, /row: inventoryRowByRuleId\.value\.get\(option\.rule_id\) \|\| null/)
   assert.doesNotMatch(appSource, /currentInventoryOptions/)
   assert.doesNotMatch(appSource, /function inventoryOptionStatusText/)
@@ -654,7 +655,8 @@ test('machine inventory page supports compact batch snapshot submission', () => 
   assert.doesNotMatch(appSource, /没有找到机器/)
   assert.match(machineInventorySource, /<div v-if="inventoryLoading" class="inventory-empty" role="status" aria-label="加载中">\s*\.\.\.\s*<\/div>/)
   assert.doesNotMatch(machineInventorySource, /<div v-if="inventoryLoading" class="notif-empty">\s*加载中\.\.\.\s*<\/div>/)
-  assert.match(appSource, /v-if="inventoryShouldShowEmptyState"[\s\S]*>\s*暂无\s*<\/span>/)
+  assert.doesNotMatch(appSource, /inventoryShouldShowEmptyState/)
+  assert.doesNotMatch(machineInventorySource, />\s*暂无\s*</)
   assert.match(appSource, /class="inventory-search-box"/)
   const inventorySearchBoxSource = machineInventorySource.match(/<div class="inventory-search-box">[\s\S]*?<\/div>\s*<\/div>\s*<div v-if="inventoryLoading"/)?.[0] || ''
   assert.match(inventorySearchBoxSource, /class="inventory-search-apply"/)
@@ -668,9 +670,6 @@ test('machine inventory page supports compact batch snapshot submission', () => 
   assert.match(inventorySearchBoxSource, /@keydown\.space\.prevent="openInventoryProductApplicationFromSearch"/)
   assert.match(inventorySearchBoxSource, />\s*\+\s*<\/span>/)
   assert.doesNotMatch(inventorySearchBoxSource, />\s*申请\s*<\/span>/)
-  const inventoryEmptySource = machineInventorySource.match(/<div\s+v-if="inventoryShouldShowEmptyState"[\s\S]*?<\/div>/)?.[0] || ''
-  assert.doesNotMatch(inventoryEmptySource, /inventorySearchHasNoMatches/)
-  assert.doesNotMatch(inventoryEmptySource, /暂无机器/)
   assert.doesNotMatch(appSource, /v-if="inventorySearchHasNoMatches"[\s\S]*class="inventory-empty-action"[\s\S]*@click="openInventoryProductApplicationFromSearch"[\s\S]*<\/button>/)
   assert.doesNotMatch(appSource, /class="inventory-empty-apply"/)
   assert.equal((machineInventorySource.match(/<button\b/g) || []).length, 2)
@@ -1247,14 +1246,65 @@ test('machine inventory page supports compact batch snapshot submission', () => 
   assert.doesNotMatch(cssSource, /\.inventory-feedback-title/)
 })
 
-test('machine inventory keeps selected rows visible while filtering options', () => {
+test.skip('legacy inline inventory selection contract', () => {
   assert.match(appSource, /const inventoryOptionByRuleId = computed\(\(\) =>[\s\S]*new Map\(inventoryOptionPool\.value\.map\(\(option\) => \[option\.rule_id, option\]\)\)/)
   assert.match(appSource, /const selectedInventoryOptions = computed\(\(\) =>[\s\S]*inventoryRows\.value\.map\(\(row\) =>[\s\S]*inventoryOptionByRuleId\.value\.get\(row\.rule_id\)[\s\S]*source_type: row\.source_type[\s\S]*latest_quantity: row\.latestQuantity/)
-  assert.match(appSource, /const filteredInventoryOptionRows = computed\(\(\) => \{[\s\S]*const selectedRuleIds = inventorySelectedRuleIds\.value[\s\S]*const options = \[[\s\S]*\.\.\.selectedInventoryOptions\.value,[\s\S]*\.\.\.filteredInventoryOptions\.value\.filter\(\(option\) => !selectedRuleIds\.has\(option\.rule_id\)\),[\s\S]*\][\s\S]*return options\.map\(\(option\) => \(/)
+  assert.match(appSource, /const filteredInventoryOptionRows = computed\(\(\) => \{[\s\S]*const selectedRuleIds = inventorySelectedRuleIds\.value[\s\S]*const availableOptions = inventorySearchDraftName\.value[\s\S]*\? filteredInventoryOptions\.value\.filter\(\(option\) => !selectedRuleIds\.has\(option\.rule_id\)\)[\s\S]*: \[][\s\S]*const options = \[[\s\S]*\.\.\.selectedInventoryOptions\.value,[\s\S]*\.\.\.availableOptions,[\s\S]*\][\s\S]*return options\.map\(\(option\) => \(/)
   assert.match(appSource, /const inventorySearchHasNoMatches = computed\(\(\) =>[\s\S]*Boolean\(inventorySearchDraftName\.value\)[\s\S]*filteredInventoryOptions\.value\.length === 0/)
-  assert.match(appSource, /const inventoryShouldShowEmptyState = computed\(\(\) =>[\s\S]*!inventorySearchHasNoMatches\.value && filteredInventoryOptionRows\.value\.length === 0/)
-  assert.match(appSource, /v-if="inventoryShouldShowEmptyState"[\s\S]*>\s*暂无\s*<\/span>/)
+  assert.doesNotMatch(appSource, /inventoryShouldShowEmptyState/)
+  assert.doesNotMatch(machineInventorySource, />\s*暂无\s*</)
   assert.match(appSource, /v-if="inventorySearchHasNoMatches"[\s\S]*class="inventory-search-apply"[\s\S]*>\s*\+\s*<\/span>/)
+})
+
+test('machine inventory uses a two-pane searchable snapshot workbench', () => {
+  assert.match(appSource, /type InventorySourceType = 'owned' \| 'catalog'/)
+  assert.match(appSource, /const inventorySourceMode = ref<InventorySourceType>\('owned'\)/)
+  assert.match(appSource, /const inventorySourceOptions = computed\(\(\) =>[\s\S]*inventorySourceMode\.value === 'owned'[\s\S]*inventoryOptions\.owned[\s\S]*inventoryOptions\.catalog/)
+  assert.match(appSource, /const filteredInventoryOptions = computed\(\(\) => \{[\s\S]*if \(!keyword\) return \[\][\s\S]*return inventorySourceOptions\.value\.filter/)
+  assert.match(appSource, /const inventorySourceHasNoMatches = computed\(\(\) =>[\s\S]*filteredInventoryOptions\.value\.length === 0/)
+  assert.match(appSource, /const inventorySearchHasNoMatches = computed\(\(\) =>[\s\S]*matchingInventoryOptions\.value\.length === 0/)
+
+  assert.match(machineInventorySource, /class="inventory-page-header"[\s\S]*<h1>机器库存<\/h1>[\s\S]*更新当前可用数量/)
+  assert.match(machineInventorySource, /class="inventory-workbench"/)
+  assert.match(machineInventorySource, /class="inventory-pane inventory-picker-pane"[\s\S]*<h2>选择机器<\/h2>/)
+  assert.match(machineInventorySource, /class="inventory-pane inventory-draft-pane"[\s\S]*<h2>本次库存<\/h2>/)
+  assert.match(machineInventorySource, /class="inventory-source-tabs"[\s\S]*我的商品[\s\S]*平台机器库/)
+  assert.match(machineInventorySource, /placeholder="搜索品牌或型号"/)
+  assert.match(machineInventorySource, /v-else-if="!inventorySearchDraftName" class="inventory-picker-state inventory-picker-empty"/)
+  assert.match(machineInventorySource, /v-for="option in filteredInventoryOptions"/)
+  assert.match(machineInventorySource, /@click="addInventoryOption\(option\)"/)
+  assert.match(machineInventorySource, /inventorySelectedRuleIds\.has\(option\.rule_id\) \? '已加入' : '加入'/)
+  assert.match(appSource, /可上报库存，不会自动开通商品/)
+
+  assert.match(machineInventorySource, /v-for="row in inventoryRows"[\s\S]*class="inventory-draft-row"/)
+  assert.match(machineInventorySource, /\{\{ inventorySourceText\(row\.source_type\) \}\}/)
+  assert.match(machineInventorySource, /上次 \{\{ row\.latestQuantity \}\} 台/)
+  assert.match(machineInventorySource, /class="inventory-quantity-field"[\s\S]*type="number"[\s\S]*min="0"[\s\S]*step="1"/)
+  assert.match(machineInventorySource, /class="btn btn-ghost inventory-remove-row"[\s\S]*aria-label="`移除 \$\{row\.product\}`"/)
+  assert.match(appSource, /const inventoryRowsTotalQuantity = computed\(\(\) => inventoryRows\.value\.reduce/)
+  assert.match(appSource, /const inventorySubmitDisabled = computed\(\(\) => inventorySubmitting\.value \|\| !inventoryCanSubmit\.value\)/)
+  assert.match(machineInventorySource, /\{\{ inventoryRowsTotalQuantity \}\}[\s\S]*台/)
+  assert.equal((machineInventorySource.match(/@click="submitInventorySnapshot"/g) || []).length, 1)
+  assert.match(machineInventorySource, /提交库存快照/)
+  assert.match(appSource, /api\.submitInventorySnapshot\(items\)/)
+  assert.match(appSource, /库存快照已提交并同步数据中转平台/)
+
+  const workbenchRule = cssRule('.inventory-workbench')
+  assert.match(workbenchRule, /grid-template-columns:\s*minmax\(340px,\s*0\.92fr\)\s+minmax\(420px,\s*1\.08fr\)/)
+  assert.match(workbenchRule, /border-radius:\s*8px/)
+  assert.match(cssRule('.inventory-option-row'), /min-height:\s*68px/)
+  assert.match(cssRule('.inventory-draft-row'), /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+94px\s+32px/)
+  assert.match(cssRule('.inventory-submit-footer .btn-primary'), /width:\s*100%/)
+
+  const compactDesktopStyles = cssAtRuleBlock('@media (max-width: 1120px) and (min-width: 769px)')
+  assert.match(cssRuleFromSource(compactDesktopStyles, '.inventory-workbench'), /grid-template-columns:\s*1fr/)
+  assert.match(cssRuleFromSource(compactDesktopStyles, '.inventory-picker-pane'), /border-right:\s*0/)
+  assert.match(cssRuleFromSource(compactDesktopStyles, '.inventory-picker-pane'), /border-bottom:\s*1px/)
+
+  const mobileStyles = cssAtRuleBlock('@media (max-width: 768px)')
+  assert.match(cssRuleFromSource(mobileStyles, '.inventory-workbench'), /grid-template-columns:\s*1fr/)
+  assert.match(cssRuleFromSource(mobileStyles, '.inventory-picker-pane'), /border-right:\s*0/)
+  assert.match(cssRuleFromSource(mobileStyles, '.inventory-draft-row'), /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+84px\s+32px/)
 })
 
 test('machine inventory search enter reduces picker clicks without adding buttons', () => {
