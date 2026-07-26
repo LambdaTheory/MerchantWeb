@@ -1293,9 +1293,10 @@ test('machine inventory uses a two-pane searchable snapshot workbench', () => {
   assert.match(appSource, /const inventorySubmitDisabled = computed\(\(\) => inventorySubmitting\.value \|\| !inventoryCanSubmit\.value\)/)
   assert.match(machineInventorySource, /\{\{ inventoryRowsTotalQuantity \}\}[\s\S]*台/)
   assert.equal((machineInventorySource.match(/@click="submitInventorySnapshot"/g) || []).length, 1)
-  assert.match(machineInventorySource, /提交库存快照/)
+  assert.match(machineInventorySource, /提交现有库存/)
   assert.match(appSource, /api\.submitInventorySnapshot\(items\)/)
-  assert.match(appSource, /库存快照已提交并同步数据中转平台/)
+  assert.match(appSource, /库存已提交/)
+  assert.doesNotMatch(machineInventorySource, /提交库存快照|数据中转平台/)
 
   const workbenchRule = cssRule('.inventory-workbench')
   assert.match(workbenchRule, /grid-template-columns:\s*minmax\(340px,\s*0\.92fr\)\s+minmax\(420px,\s*1\.08fr\)/)

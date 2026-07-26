@@ -60,8 +60,8 @@ The desktop page uses one framed two-column workspace rather than several unrela
   - numeric quantity input with a visible `台` suffix
   - icon-only remove action
 - An empty state is shown before any machine is selected.
-- The footer contains validation or submission summary text and one `提交库存快照` button.
-- After a successful request, the page confirms that the snapshot was submitted and synchronized to the data relay platform.
+- The footer contains validation or submission summary text and one merchant-friendly `提交现有库存` button.
+- After a successful request, the page shows the merchant-friendly confirmation `库存已提交` without exposing internal synchronization terminology.
 
 ## Interaction Rules
 

@@ -10,7 +10,7 @@ Merchants select machines from two sources, enter only the current stock quantit
 
 - Main navigation label: `机器库存`
 - Page title: `机器库存`
-- Submit button: `提交库存快照`
+- Submit button: `提交现有库存`
 - First version is inventory snapshot collection, not real-time stock locking.
 - Each selected machine only requires one field: `库存数量`.
 - Submit mode is batch-only: merchants fill multiple rows and submit once.
@@ -53,7 +53,7 @@ Desktop layout:
 - Right panel: `上报清单`
   - Selected machines as compact cards
   - Each card has product name, source label, `库存数量` numeric input, and `移除`
-  - Footer has one primary `提交库存快照` button
+  - Footer has one primary `提交现有库存` button
 
 Mobile layout:
 
@@ -154,7 +154,7 @@ Frontend contract tests should assert:
 
 - Navigation includes `机器库存`.
 - `navActiveIndex` accounts for five main nav entries.
-- The inventory page renders only one `提交库存快照` button in the list footer.
+- The inventory page renders only one `提交现有库存` button in the list footer.
 - Picker toolbar combines `选择机器`, search input, and source tabs.
 - Page labels include `我的商品`, `平台机器库`, `平台库`, `待申请`, `上报清单`, `库存数量`.
 - API client exposes inventory option, snapshot submit, and latest inventory methods.

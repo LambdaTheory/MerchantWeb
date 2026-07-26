@@ -1202,7 +1202,7 @@ async function submitInventorySnapshot() {
         option.latest_quantity = submitted.quantity
       }
     }
-    showInventoryNotice('库存快照已提交并同步数据中转平台')
+    showInventoryNotice('库存已提交')
     inventoryRows.value = []
     focusInventorySearchInput()
     return
@@ -1211,7 +1211,7 @@ async function submitInventorySnapshot() {
   inventorySubmitting.value = true
   try {
     await api.submitInventorySnapshot(items)
-    showInventoryNotice('库存快照已提交并同步数据中转平台')
+    showInventoryNotice('库存已提交')
     inventoryRows.value = []
     await refreshInventoryOptions()
     focusInventorySearchInput()
@@ -3188,10 +3188,10 @@ async function run(task: () => Promise<void>) {
                   <button
                     class="btn btn-primary"
                     :disabled="inventorySubmitDisabled"
-                    :aria-label="inventorySubmitting ? '提交中' : '提交库存快照'"
+                    :aria-label="inventorySubmitting ? '提交中' : '提交现有库存'"
                     @click="submitInventorySnapshot"
                   >
-                    {{ inventorySubmitting ? '提交中...' : '提交库存快照' }}
+                    {{ inventorySubmitting ? '提交中...' : '提交现有库存' }}
                   </button>
                 </footer>
               </section>
