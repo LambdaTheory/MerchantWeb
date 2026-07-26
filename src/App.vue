@@ -287,6 +287,7 @@ const inventorySearchDraftName = computed(() => inventorySearch.value.trim())
 const inventorySourceOptions = computed(() =>
   inventorySourceMode.value === 'owned' ? inventoryOptions.owned : inventoryOptions.catalog
 )
+const inventorySourceCount = computed(() => inventorySourceOptions.value.length)
 const matchingInventoryOptions = computed(() => {
   const keyword = inventorySearchDraftName.value.toLowerCase()
   if (!keyword) return []
@@ -301,7 +302,11 @@ const matchingInventoryOptions = computed(() => {
 })
 const filteredInventoryOptions = computed(() => {
   const keyword = inventorySearchDraftName.value.toLowerCase()
-  if (!keyword) return []
+  if (!keyword) {
+    return inventorySourceMode.value === 'owned'
+      ? inventoryOptions.owned
+      : []
+  }
   return inventorySourceOptions.value.filter((option) => {
     const haystack = [
       option.product,
@@ -311,11 +316,20 @@ const filteredInventoryOptions = computed(() => {
     return haystack.includes(keyword)
   })
 })
+const inventorySourceIsEmpty = computed(() => inventorySourceCount.value === 0)
+const inventoryCatalogAwaitingSearch = computed(() =>
+  inventorySourceMode.value === 'catalog'
+  && !inventorySearchDraftName.value
+  && !inventorySourceIsEmpty.value
+)
 const inventorySourceHasNoMatches = computed(() =>
   Boolean(inventorySearchDraftName.value) && filteredInventoryOptions.value.length === 0
 )
 const inventorySearchHasNoMatches = computed(() =>
   Boolean(inventorySearchDraftName.value) && matchingInventoryOptions.value.length === 0
+)
+const inventoryOtherSourceMatchCount = computed(() =>
+  matchingInventoryOptions.value.filter((option) => option.source_type !== inventorySourceMode.value).length
 )
 const inventoryRowsTotalQuantity = computed(() => inventoryRows.value.reduce((total, row) => {
   const quantity = Number(row.quantity)
@@ -327,8 +341,16 @@ const inventoryLatestSubmittedAt = computed(() => latestInventoryItems.value.red
   return new Date(item.submitted_at).getTime() > new Date(latest).getTime() ? item.submitted_at : latest
 }, null))
 const inventorySourceNote = computed(() => inventorySourceMode.value === 'owned'
-  ? '商品管理中已开通的机器'
-  : '可上报库存，不会自动开通商品'
+  ? '已开通，可直接选择'
+  : '上报库存不会自动开通商品'
+)
+const inventorySearchPlaceholder = computed(() => inventorySourceMode.value === 'owned'
+  ? '搜索我的商品'
+  : '搜索平台机器库'
+)
+const inventoryOtherSourceText = computed(() => inventorySourceMode.value === 'owned'
+  ? '平台机器库'
+  : '我的商品'
 )
 const inventoryCanSubmit = computed(() =>
   inventoryRows.value.length > 0 && hasValidInventorySnapshotQuantities(inventoryRows.value)
@@ -1140,7 +1162,13 @@ function focusInventorySearchInput() {
 }
 
 function switchInventorySource(sourceType: InventorySourceType) {
+  if (inventorySourceMode.value === sourceType) {
+    focusInventorySearchInput()
+    return
+  }
+
   inventorySourceMode.value = sourceType
+  inventorySearch.value = ''
   focusInventorySearchInput()
 }
 
@@ -2967,7 +2995,7 @@ async function run(task: () => Promise<void>) {
                 <header class="inventory-pane-header">
                   <div>
                     <h2>选择机器</h2>
-                    <p>搜索后加入本次清单</p>
+                    <p>点击机器加入本次清单</p>
                   </div>
                 </header>
 
@@ -2980,7 +3008,8 @@ async function run(task: () => Promise<void>) {
                       :class="{ active: inventorySourceMode === 'owned' }"
                       @click="switchInventorySource('owned')"
                     >
-                      我的商品
+                      <span>我的商品</span>
+                      <span class="inventory-source-count">{{ inventoryOptions.owned.length }}</span>
                     </button>
                     <button
                       type="button"
@@ -2989,11 +3018,12 @@ async function run(task: () => Promise<void>) {
                       :class="{ active: inventorySourceMode === 'catalog' }"
                       @click="switchInventorySource('catalog')"
                     >
-                      平台机器库
+                      <span>平台机器库</span>
+                      <span class="inventory-source-count">{{ inventoryOptions.catalog.length }}</span>
                     </button>
                   </div>
 
-                  <div class="inventory-search-box">
+                  <div class="inventory-search-box" :class="{ 'has-action': inventorySearchHasNoMatches }">
                     <svg class="inventory-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                       <circle cx="11" cy="11" r="7" />
                       <path d="m20 20-3.5-3.5" />
@@ -3007,7 +3037,7 @@ async function run(task: () => Promise<void>) {
                       data-inventory-search
                       @keydown.enter="handleInventorySearchEnter"
                       @keydown.esc="handleInventorySearchEscape"
-                      placeholder="搜索品牌或型号"
+                      :placeholder="inventorySearchPlaceholder"
                     />
                     <span
                       v-if="inventorySearchHasNoMatches"
@@ -3030,18 +3060,29 @@ async function run(task: () => Promise<void>) {
                   <span class="inventory-loading-mark" aria-hidden="true"></span>
                   正在加载机器
                 </div>
-                <div v-else-if="!inventorySearchDraftName" class="inventory-picker-state inventory-picker-empty">
+                <div v-else-if="inventorySourceIsEmpty" class="inventory-picker-state inventory-picker-empty">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                    <path d="M5 7.5h14v11H5z" />
+                    <path d="M8 7.5V5h8v2.5" />
+                    <path d="M9 12h6" />
+                  </svg>
+                  <strong>{{ inventorySourceMode === 'owned' ? '暂无已开通商品' : '平台机器库暂无机器' }}</strong>
+                  <span>{{ inventorySourceMode === 'owned' ? '请联系平台开通商品' : '请稍后再试' }}</span>
+                </div>
+                <div v-else-if="inventoryCatalogAwaitingSearch" class="inventory-picker-state inventory-picker-empty">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
                     <circle cx="11" cy="11" r="7" />
                     <path d="m20 20-3.5-3.5" />
                   </svg>
-                  <strong>输入品牌或型号</strong>
-                  <span>找到后点击机器即可加入</span>
+                  <strong>搜索平台机器库</strong>
+                  <span>输入品牌或型号</span>
                 </div>
                 <div v-else-if="inventorySourceHasNoMatches" class="inventory-picker-state inventory-picker-empty">
-                  <strong>当前来源没有匹配机器</strong>
-                  <span v-if="!inventorySearchHasNoMatches">可切换另一个来源查看</span>
-                  <span v-else>可点击搜索框内的“申请新增”</span>
+                  <strong>未找到“{{ inventorySearchDraftName }}”</strong>
+                  <span v-if="inventoryOtherSourceMatchCount > 0">
+                    {{ inventoryOtherSourceText }}有 {{ inventoryOtherSourceMatchCount }} 个结果
+                  </span>
+                  <span v-else>可在搜索框申请新增</span>
                 </div>
                 <div v-else class="inventory-option-list">
                   <div

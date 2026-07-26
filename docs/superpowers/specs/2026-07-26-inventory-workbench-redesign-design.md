@@ -14,7 +14,8 @@ The existing backend inventory APIs, snapshot semantics, CentralizedDataHub sync
 - Machines can come from both the merchant's enabled products and the platform catalog.
 - Reporting a platform catalog machine does not automatically enable that product for the merchant.
 - Only one primary submit button is shown.
-- Empty search does not render the whole machine catalog. Search results appear only after the merchant enters a brand or model.
+- `我的商品` renders the merchant's enabled products immediately so the page never looks disconnected when data exists.
+- `平台机器库` remains search-first and does not render the whole catalog before the merchant enters a brand or model.
 - Selected machines remain visible in the inventory draft regardless of the active source tab or search keyword.
 
 ## Information Architecture
@@ -31,8 +32,8 @@ The desktop page uses one framed two-column workspace rather than several unrela
 
 - Section title: `选择机器`
 - Segmented source control:
-  - `我的商品`
-  - `平台机器库`
+  - `我的商品` with the enabled-product count
+  - `平台机器库` with the catalog count
 - Search input for brand, model, category, and keywords
 - A short source-specific note beneath the search field
 - Search result rows containing:
@@ -40,7 +41,11 @@ The desktop page uses one framed two-column workspace rather than several unrela
   - source or availability state
   - latest submitted quantity when available
   - selection state
-- The full catalog is never rendered before a search term is entered.
+- Empty search in `我的商品` renders all enabled merchant products.
+- Empty search in `平台机器库` renders a concise search prompt instead of all catalog products.
+- Switching sources clears the previous source's search term while preserving the inventory draft.
+- Empty states distinguish genuinely missing source data, a catalog waiting for search, and a search with no match.
+- If the current source has no matching machine but the other source does, the page identifies the other source and its matching count.
 - If there is no match, the existing quick product application flow can be opened from the search area.
 - The result row itself is the selection target, so a separate `加入` button is not required.
 
@@ -98,7 +103,7 @@ The desktop page uses one framed two-column workspace rather than several unrela
 
 ## Testing
 
-- Contract tests verify the two-pane structure, both sources, search-gated results, selected draft rows, quantity validation, one primary submit action, and CentralizedDataHub confirmation copy.
+- Contract tests verify the two-pane structure, immediate owned-product visibility, search-gated catalog results, source counts, precise empty states, selected draft rows, quantity validation, one primary submit action, and CentralizedDataHub confirmation copy.
 - Unit tests continue to cover inventory payload validation.
 - Run the full test suite and production build.
 - Visually verify the preview page at desktop and 390px mobile widths, including source switching, search, selection, quantity editing, removal, invalid state, and submission.
