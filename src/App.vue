@@ -302,11 +302,7 @@ const matchingInventoryOptions = computed(() => {
 })
 const filteredInventoryOptions = computed(() => {
   const keyword = inventorySearchDraftName.value.toLowerCase()
-  if (!keyword) {
-    return inventorySourceMode.value === 'owned'
-      ? inventoryOptions.owned
-      : []
-  }
+  if (!keyword) return inventorySourceOptions.value
   return inventorySourceOptions.value.filter((option) => {
     const haystack = [
       option.product,
@@ -317,11 +313,6 @@ const filteredInventoryOptions = computed(() => {
   })
 })
 const inventorySourceIsEmpty = computed(() => inventorySourceCount.value === 0)
-const inventoryCatalogAwaitingSearch = computed(() =>
-  inventorySourceMode.value === 'catalog'
-  && !inventorySearchDraftName.value
-  && !inventorySourceIsEmpty.value
-)
 const inventorySourceHasNoMatches = computed(() =>
   Boolean(inventorySearchDraftName.value) && filteredInventoryOptions.value.length === 0
 )
@@ -3068,14 +3059,6 @@ async function run(task: () => Promise<void>) {
                   </svg>
                   <strong>{{ inventorySourceMode === 'owned' ? '暂无已开通商品' : '平台机器库暂无机器' }}</strong>
                   <span>{{ inventorySourceMode === 'owned' ? '请联系平台开通商品' : '请稍后再试' }}</span>
-                </div>
-                <div v-else-if="inventoryCatalogAwaitingSearch" class="inventory-picker-state inventory-picker-empty">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-                    <circle cx="11" cy="11" r="7" />
-                    <path d="m20 20-3.5-3.5" />
-                  </svg>
-                  <strong>搜索平台机器库</strong>
-                  <span>输入品牌或型号</span>
                 </div>
                 <div v-else-if="inventorySourceHasNoMatches" class="inventory-picker-state inventory-picker-empty">
                   <strong>未找到“{{ inventorySearchDraftName }}”</strong>

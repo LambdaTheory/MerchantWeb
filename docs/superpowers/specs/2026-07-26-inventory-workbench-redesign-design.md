@@ -15,7 +15,7 @@ The existing backend inventory APIs, snapshot semantics, CentralizedDataHub sync
 - Reporting a platform catalog machine does not automatically enable that product for the merchant.
 - Only one primary submit button is shown.
 - `我的商品` renders the merchant's enabled products immediately so the page never looks disconnected when data exists.
-- `平台机器库` remains search-first and does not render the whole catalog before the merchant enters a brand or model.
+- `平台机器库` renders the available catalog immediately and supports search filtering within the fixed-height list.
 - Selected machines remain visible in the inventory draft regardless of the active source tab or search keyword.
 
 ## Information Architecture
@@ -42,9 +42,9 @@ The desktop page uses one framed two-column workspace rather than several unrela
   - latest submitted quantity when available
   - selection state
 - Empty search in `我的商品` renders all enabled merchant products.
-- Empty search in `平台机器库` renders a concise search prompt instead of all catalog products.
+- Empty search in `平台机器库` renders all available catalog products so merchants can browse without knowing an exact brand or model.
 - Switching sources clears the previous source's search term while preserving the inventory draft.
-- Empty states distinguish genuinely missing source data, a catalog waiting for search, and a search with no match.
+- Empty states distinguish genuinely missing source data from a search with no match.
 - If the current source has no matching machine but the other source does, the page identifies the other source and its matching count.
 - If there is no match, the existing quick product application flow can be opened from the search area.
 - The result row itself is the selection target, so a separate `加入` button is not required.
